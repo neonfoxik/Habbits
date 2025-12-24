@@ -3,20 +3,38 @@
 # Stage 1: Build React app
 FROM node:18-alpine AS frontend-build
 
+# Set working directory for React build
 WORKDIR /app
 
-# Copy entire frontend directory
-COPY frontend/ ./
+# Verify working directory
+RUN echo "Working directory: $(pwd)"
 
-# Verify that all files were copied
-RUN echo "=== VERIFYING FRONTEND FILES ===" && \
+# Copy frontend files to root (not in subfolder)
+COPY frontend/package.json ./
+COPY frontend/public ./public
+COPY frontend/src ./src
+COPY frontend/README.md ./
+# Copy any other files that might be needed
+COPY frontend/*.* ./ 2>/dev/null || true
+
+# Verify that all files were copied correctly
+RUN echo "=== VERIFYING COPIED FILES ===" && \
+    echo "Current directory: $(pwd)" && \
     echo "Root files:" && ls -la && \
+    echo "Package.json exists:" && test -f package.json && echo "✅ package.json found" || echo "❌ package.json missing" && \
     echo "Public folder:" && ls -la public/ && \
-    echo "Src folder:" && ls -la src/ && \
-    echo "Package.json exists:" && test -f package.json && echo "YES" || echo "NO"
+    echo "Index.html exists:" && test -f public/index.html && echo "✅ index.html found" || echo "❌ index.html missing" && \
+    echo "Src folder:" && ls -la src/
 
 # Install dependencies (production only)
 RUN npm install --omit=dev --no-package-lock
+
+# Final verification before build
+RUN echo "=== FINAL CHECK BEFORE BUILD ===" && \
+    echo "Working directory: $(pwd)" && \
+    echo "Files in /app:" && ls -la && \
+    echo "Files in public:" && ls -la public/ && \
+    echo "Package.json content:" && cat package.json | head -10
 
 # Build the app
 RUN npm run build
