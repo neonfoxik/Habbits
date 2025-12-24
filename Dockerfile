@@ -5,10 +5,8 @@ FROM node:18-alpine AS frontend-build
 
 WORKDIR /app
 
-# Copy entire frontend directory
-COPY frontend/ ./frontend/
-
-WORKDIR /app/frontend
+# Copy frontend source code
+COPY frontend/ ./
 
 # Install dependencies (production only)
 RUN npm install --omit=dev --no-package-lock
@@ -41,7 +39,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY backend/ .
 
 # Copy React build from previous stage
-COPY --from=frontend-build /app/frontend/build ./frontend/build
+COPY --from=frontend-build /app/build ./frontend/build
 
 # Create staticfiles directory
 RUN mkdir -p staticfiles
