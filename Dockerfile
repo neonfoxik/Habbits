@@ -5,8 +5,14 @@ FROM node:18-alpine AS frontend-build
 
 WORKDIR /app
 
-# Copy frontend source code
+# Copy package.json only (exclude package-lock.json)
+COPY frontend/package.json ./
+
+# Copy all frontend files
 COPY frontend/ ./
+
+# Debug: list files to verify structure
+RUN ls -la && echo "--- public folder ---" && ls -la public/
 
 # Install dependencies (production only)
 RUN npm install --omit=dev --no-package-lock
@@ -38,8 +44,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy Django project
 COPY backend/ .
 
-# Copy React build from previous stage
-COPY --from=frontend-build /app/build ./frontend/build
+# Copy React build from previous stage (relative to project root)
+COPY --from=frontend-build /app/build ../frontend/build
 
 # Create staticfiles directory
 RUN mkdir -p staticfiles
