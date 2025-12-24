@@ -37,6 +37,12 @@ echo ""
 echo "4. Nginx Status:"
 if docker-compose -f "$COMPOSE_FILE" exec -T nginx nginx -t &>/dev/null; then
     echo "✅ Nginx configuration is valid"
+    # Check if nginx is running properly
+    if curl -f --max-time 5 http://localhost/ &>/dev/null; then
+        echo "✅ Nginx is responding on port 80"
+    else
+        echo "❌ Nginx is not responding on port 80"
+    fi
 else
     echo "❌ Nginx configuration has errors:"
     docker-compose -f "$COMPOSE_FILE" exec -T nginx nginx -t 2>&1

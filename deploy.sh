@@ -204,6 +204,8 @@ main() {
         echo -e "${YELLOW}🔧 Management commands:${NC}"
         echo "   View logs: ./deploy.sh logs"
         echo "   Restart: ./deploy.sh restart"
+        echo "   Reload nginx: ./deploy.sh reload-nginx"
+        echo "   Fix nginx: ./deploy.sh fix-nginx"
         echo "   Stop: ./deploy.sh down"
         echo "   Diagnose: ./diagnose.sh"
     else
@@ -233,6 +235,21 @@ case "${1:-}" in
     "restart")
         log_info "Restarting containers..."
         docker-compose -f "$COMPOSE_FILE" restart
+        ;;
+    "reload-nginx")
+        log_info "Testing nginx configuration..."
+        if docker-compose -f "$COMPOSE_FILE" exec -T nginx nginx -t; then
+            log_success "Nginx configuration is valid, reloading..."
+            docker-compose -f "$COMPOSE_FILE" exec nginx nginx -s reload
+            log_success "Nginx reloaded successfully"
+        else
+            log_error "Nginx configuration has errors!"
+            exit 1
+        fi
+        ;;
+    "fix-nginx")
+        log_info "Recreating nginx container with new configuration..."
+        docker-compose -f "$COMPOSE_FILE" up -d --force-recreate nginx
         ;;
     "clean-db")
         log_warning "This will DELETE all database data!"
