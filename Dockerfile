@@ -5,16 +5,15 @@ FROM node:18-alpine AS frontend-build
 
 WORKDIR /app
 
-# Copy package.json only (exclude package-lock.json)
-COPY frontend/package.json ./
+# Copy entire frontend directory
+COPY frontend/ ./
 
-# Copy essential React files explicitly
-COPY frontend/public ./public
-COPY frontend/src ./src
-COPY frontend/README.md ./
-
-# Debug: list files to verify structure
-RUN echo "=== ROOT FILES ===" && ls -la && echo "=== PUBLIC FOLDER ===" && ls -la public/ && echo "=== SRC FOLDER ===" && ls -la src/
+# Verify that all files were copied
+RUN echo "=== VERIFYING FRONTEND FILES ===" && \
+    echo "Root files:" && ls -la && \
+    echo "Public folder:" && ls -la public/ && \
+    echo "Src folder:" && ls -la src/ && \
+    echo "Package.json exists:" && test -f package.json && echo "YES" || echo "NO"
 
 # Install dependencies (production only)
 RUN npm install --omit=dev --no-package-lock
