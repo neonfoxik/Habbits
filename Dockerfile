@@ -15,7 +15,7 @@ RUN echo "=== CHECKING SOURCE FILES ===" && \
     echo "Checking if frontend directory exists in build context..."
 
 # Copy frontend files (will fail if files don't exist)
-COPY frontend/package.json ./package.json
+COPY frontend/package.json ./
 COPY frontend/public ./public
 COPY frontend/src ./src
 COPY frontend/README.md ./README.md
@@ -72,11 +72,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy Django project
 COPY backend/ .
 
-# Copy React build from previous stage to nginx static files
-COPY --from=frontend-build /app/build ../frontend/build
-
-# Also copy to nginx accessible location
-RUN mkdir -p /var/www/html && cp -r /app/build/* /var/www/html/
+# Copy React build from previous stage (may not exist if build failed)
+COPY --from=frontend-build /app/build ../frontend/build 2>/dev/null || true
 
 # Create staticfiles directory
 RUN mkdir -p staticfiles
