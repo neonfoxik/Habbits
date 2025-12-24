@@ -42,11 +42,12 @@ RUN echo "=== FINAL CHECK BEFORE BUILD ===" && \
 # Build the app
 RUN npm run build
 
-# Verify build output
+# Verify build output exists
 RUN echo "=== BUILD OUTPUT VERIFICATION ===" && \
     ls -la build/ && \
-    test -f build/index.html && echo "✅ index.html exists" || echo "❌ index.html missing" && \
-    find build -name "*.js" | head -3 | xargs ls -la
+    test -f build/index.html && echo "✅ index.html exists" || (echo "❌ index.html missing" && exit 1) && \
+    find build -name "*.js" | head -3 | xargs ls -la && \
+    echo "✅ React build successful"
 
 # Stage 2: Setup Python environment
 FROM python:3.11-slim
@@ -72,8 +73,13 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy Django project
 COPY backend/ .
 
-# Copy React build from previous stage (may not exist if build failed)
-COPY --from=frontend-build /app/build ../frontend/build 2>/dev/null || true
+# Copy React build from previous stage
+COPY --from=frontend-build /app/build ../frontend/build
+
+# Verify React build was copied
+RUN echo "=== REACT BUILD VERIFICATION ===" && \
+    ls -la ../frontend/build/ && \
+    test -f ../frontend/build/index.html && echo "✅ React build copied successfully" || echo "❌ React build copy failed"
 
 # Create staticfiles directory
 RUN mkdir -p staticfiles
