@@ -113,9 +113,15 @@ health_check() {
     local attempt=1
 
     while [ $attempt -le $max_attempts ]; do
-        if curl -f http://localhost/health/ &>/dev/null; then
+        # Check Django backend directly on port 8000
+        if curl -f --max-time 10 http://localhost:8000/health/ &>/dev/null; then
             log_success "Application is healthy!"
             return 0
+        fi
+
+        # On first few attempts, also check if backend is responding at all
+        if [ $attempt -le 3 ] && curl -f --max-time 5 http://localhost:8000/ &>/dev/null; then
+            log_info "Backend is responding, waiting for health endpoint..."
         fi
 
         log_info "Waiting for application to be ready... (attempt $attempt/$max_attempts)"
@@ -124,6 +130,12 @@ health_check() {
     done
 
     log_error "Health check failed after $max_attempts attempts"
+    log_info "🔍 Debugging information:"
+    log_info "Container status:"
+    docker-compose -f "$COMPOSE_FILE" ps
+    log_info "Backend logs:"
+    docker-compose -f "$COMPOSE_FILE" logs --tail=20 backend
+    log_info "Check manually: curl http://localhost:8000/health/"
     return 1
 }
 
@@ -136,7 +148,8 @@ show_status() {
     echo "  - Frontend: http://localhost"
     echo "  - API: http://localhost/api/"
     echo "  - Admin: http://localhost/admin/"
-    echo "  - Health: http://localhost/health/"
+    echo "  - Backend direct: http://localhost:8000/"
+    echo "  - Health check: http://localhost:8000/health/"
 }
 
 # Main deployment function

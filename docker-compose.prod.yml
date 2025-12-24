@@ -7,6 +7,8 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: habits-backend
+    ports:
+      - "8000:8000"  # Expose port for health checks
     volumes:
       - static_volume:/app/staticfiles
       - media_volume:/app/mediafiles
@@ -15,7 +17,8 @@ services:
     env_file:
       - .env
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     restart: unless-stopped
 
   # PostgreSQL database
@@ -29,6 +32,11 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U habits_user -d habits_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   # Nginx reverse proxy
   nginx:
