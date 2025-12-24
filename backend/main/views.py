@@ -1,8 +1,36 @@
 import os
-from django.http import HttpResponse
+import json
+from django.http import JsonResponse
 from django.shortcuts import render
 from django.conf import settings
 from django.templatetags.static import static
+from django.db import connection
+
+
+def health_check(request):
+    """
+    Health check endpoint for monitoring
+    """
+    try:
+        # Check database connection
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT 1")
+            db_status = "healthy"
+    except Exception:
+        db_status = "unhealthy"
+
+    # Check if React build exists
+    react_build_exists = os.path.exists(os.path.join(settings.REACT_APP_DIR, 'index.html'))
+
+    health_data = {
+        "status": "healthy" if db_status == "healthy" else "unhealthy",
+        "database": db_status,
+        "react_build": "exists" if react_build_exists else "missing",
+        "version": "1.0.0"
+    }
+
+    status_code = 200 if health_data["status"] == "healthy" else 503
+    return JsonResponse(health_data, status=status_code)
 
 
 def index(request):
