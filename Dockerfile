@@ -9,13 +9,16 @@ WORKDIR /app
 # Verify working directory
 RUN echo "Working directory: $(pwd)"
 
-# Copy frontend files to root (not in subfolder)
-COPY frontend/package.json ./
+# Check if frontend files exist before copying
+RUN echo "=== CHECKING SOURCE FILES ===" && \
+    ls -la /tmp/ && \
+    echo "Checking if frontend directory exists in build context..."
+
+# Copy frontend files (will fail if files don't exist)
+COPY frontend/package.json ./package.json
 COPY frontend/public ./public
 COPY frontend/src ./src
-COPY frontend/README.md ./
-# Copy any other files that might be needed
-COPY frontend/*.* ./ 2>/dev/null || true
+COPY frontend/README.md ./README.md
 
 # Verify that all files were copied correctly
 RUN echo "=== VERIFYING COPIED FILES ===" && \
