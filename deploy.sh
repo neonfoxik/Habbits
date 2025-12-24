@@ -129,6 +129,15 @@ health_check() {
         ((attempt++))
     done
 
+    # Additional check: verify nginx configuration
+    log_info "Checking nginx configuration..."
+    if docker-compose -f "$COMPOSE_FILE" exec -T nginx nginx -t &>/dev/null; then
+        log_success "Nginx configuration is valid"
+    else
+        log_warning "Nginx configuration has errors - check logs"
+        docker-compose -f "$COMPOSE_FILE" logs nginx | tail -10
+    fi
+
     log_error "Health check failed after $max_attempts attempts"
     log_info "🔍 Debugging information:"
     log_info "Container status:"
@@ -144,17 +153,32 @@ show_status() {
     log_info "Container status:"
     docker-compose -f "$COMPOSE_FILE" ps
 
+    # Get server IP address
+    SERVER_IP=$(curl -s ifconfig.me 2>/dev/null || hostname -I | awk '{print $1}' || echo "your-server-ip")
+
     log_info "Application URLs:"
-    echo "  - Frontend: http://localhost"
-    echo "  - API: http://localhost/api/"
-    echo "  - Admin: http://localhost/admin/"
-    echo "  - Backend direct: http://localhost:8000/"
-    echo "  - Health check: http://localhost:8000/health/"
+    echo "  - Frontend: http://$SERVER_IP"
+    echo "  - API: http://$SERVER_IP/api/"
+    echo "  - Admin: http://$SERVER_IP/admin/"
+    echo "  - Backend direct: http://$SERVER_IP:8000/"
+    echo "  - Health check: http://$SERVER_IP:8000/health/"
+    echo ""
+    echo "  📋 Server Info:"
+    echo "  - IP Address: $SERVER_IP"
+    echo "  - Nginx Port: 80"
+    echo "  - Backend Port: 8000"
 }
 
 # Main deployment function
 main() {
     echo -e "${BLUE}🚀 Starting deployment of Habits Tracker${NC}"
+    echo
+
+    # Show server info
+    SERVER_IP=$(curl -s ifconfig.me 2>/dev/null || hostname -I | awk '{print $1}' || echo "localhost")
+    echo -e "${BLUE}📋 Server Information:${NC}"
+    echo "   IP Address: $SERVER_IP"
+    echo "   Domain: Check ALLOWED_HOSTS in .env"
     echo
 
     check_dependencies
@@ -169,7 +193,19 @@ main() {
         show_status
         log_success "🎉 Deployment completed successfully!"
         echo
-        log_info "Your application is now running at: http://localhost"
+        SERVER_IP=$(curl -s ifconfig.me 2>/dev/null || hostname -I | awk '{print $1}' || echo "your-server-ip")
+        log_info "Your application is now running at: http://$SERVER_IP"
+        echo
+        echo -e "${GREEN}📱 Access your application:${NC}"
+        echo "   Frontend: http://$SERVER_IP"
+        echo "   Admin: http://$SERVER_IP/admin/"
+        echo "   API: http://$SERVER_IP/api/"
+        echo
+        echo -e "${YELLOW}🔧 Management commands:${NC}"
+        echo "   View logs: ./deploy.sh logs"
+        echo "   Restart: ./deploy.sh restart"
+        echo "   Stop: ./deploy.sh down"
+        echo "   Diagnose: ./diagnose.sh"
     else
         log_error "Deployment failed during health check"
         exit 1

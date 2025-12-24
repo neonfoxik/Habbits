@@ -1,6 +1,6 @@
 # Upstream backend
 upstream habits_backend {
-    server backend:8000;
+    server habits-backend:8000;
 }
 
 # HTTP to HTTPS redirect (uncomment when SSL is configured)
@@ -13,7 +13,7 @@ upstream habits_backend {
 # Main server block
 server {
     listen 80;
-    server_name your-domain.com www.your-domain.com localhost;
+    server_name _;
 
     # Security headers
     add_header X-Frame-Options DENY;
