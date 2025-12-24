@@ -8,11 +8,13 @@ WORKDIR /app
 # Copy package.json only (exclude package-lock.json)
 COPY frontend/package.json ./
 
-# Copy all frontend files
-COPY frontend/ ./
+# Copy essential React files explicitly
+COPY frontend/public ./public
+COPY frontend/src ./src
+COPY frontend/README.md ./
 
 # Debug: list files to verify structure
-RUN ls -la && echo "--- public folder ---" && ls -la public/
+RUN echo "=== ROOT FILES ===" && ls -la && echo "=== PUBLIC FOLDER ===" && ls -la public/ && echo "=== SRC FOLDER ===" && ls -la src/
 
 # Install dependencies (production only)
 RUN npm install --omit=dev --no-package-lock
