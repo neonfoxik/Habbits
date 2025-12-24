@@ -1,0 +1,54 @@
+# Git
+.git
+.gitignore
+
+# Documentation
+README*.md
+*.txt
+DEPLOYMENT.md
+
+# Docker files
+Dockerfile*
+docker-compose*.yml
+deploy.sh
+.dockerignore
+
+# Node modules (will be installed in container)
+**/node_modules
+
+# Python cache and virtual environments
+**/__pycache__
+**/*.pyc
+**/*.pyo
+**/.Python
+**/env
+**/venv
+**/ENV
+
+# IDE files
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Database files
+*.sqlite3
+*.db
+
+# Temporary files
+*.tmp
+*.temp
+
+# Nginx config (not needed in build context)
+nginx/
+
+# SSL certificates
+ssl/

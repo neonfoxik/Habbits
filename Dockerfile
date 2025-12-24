@@ -3,16 +3,15 @@
 # Stage 1: Build React app
 FROM node:18-alpine AS frontend-build
 
-WORKDIR /app/frontend
+WORKDIR /app
 
-# Copy package files
-COPY frontend/package*.json ./
+# Copy entire frontend directory
+COPY frontend/ ./frontend/
+
+WORKDIR /app/frontend
 
 # Install dependencies (production only)
 RUN npm install --omit=dev --no-package-lock
-
-# Copy source code
-COPY frontend/ ./
 
 # Build the app
 RUN npm run build
