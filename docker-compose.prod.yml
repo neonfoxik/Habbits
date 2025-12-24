@@ -27,16 +27,19 @@ services:
     container_name: habits-db
     environment:
       - POSTGRES_DB=habits_db
+      - POSTGRES_USER=${DB_USER:-habits_user}
+      - POSTGRES_PASSWORD=${DB_PASSWORD:-habits_password}
     env_file:
       - .env
     volumes:
       - postgres_data:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U habits_user -d habits_db"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-habits_user} -d $${POSTGRES_DB:-habits_db}"]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 10s
 
   # Nginx reverse proxy
   nginx:

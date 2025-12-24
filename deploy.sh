@@ -198,6 +198,16 @@ case "${1:-}" in
         log_info "Restarting containers..."
         docker-compose -f "$COMPOSE_FILE" restart
         ;;
+    "clean-db")
+        log_warning "This will DELETE all database data!"
+        read -p "Are you sure? (yes/no): " -r
+        if [[ $REPLY =~ ^yes$ ]]; then
+            log_info "Stopping containers and removing database volume..."
+            docker-compose -f "$COMPOSE_FILE" down -v
+            log_success "Database cleaned. Run './deploy.sh' to restart."
+        fi
+        exit 0
+        ;;
     "status")
         show_status
         ;;
@@ -206,6 +216,16 @@ case "${1:-}" in
         ;;
     "static")
         collect_static
+        ;;
+    "clean-db")
+        log_warning "This will DELETE all database data!"
+        read -p "Are you sure? (yes/no): " -r
+        if [[ $REPLY =~ ^yes$ ]]; then
+            log_info "Stopping containers and removing database volume..."
+            docker-compose -f "$COMPOSE_FILE" down -v
+            log_success "Database cleaned. Run './deploy.sh' to restart."
+        fi
+        exit 0
         ;;
     *)
         main
