@@ -1,6 +1,6 @@
 import os
 import json
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from django.shortcuts import render
 from django.conf import settings
 from django.templatetags.static import static

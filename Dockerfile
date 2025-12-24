@@ -42,6 +42,12 @@ RUN echo "=== FINAL CHECK BEFORE BUILD ===" && \
 # Build the app
 RUN npm run build
 
+# Verify build output
+RUN echo "=== BUILD OUTPUT VERIFICATION ===" && \
+    ls -la build/ && \
+    test -f build/index.html && echo "✅ index.html exists" || echo "❌ index.html missing" && \
+    find build -name "*.js" | head -3 | xargs ls -la
+
 # Stage 2: Setup Python environment
 FROM python:3.11-slim
 
@@ -66,8 +72,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy Django project
 COPY backend/ .
 
-# Copy React build from previous stage (relative to project root)
+# Copy React build from previous stage to nginx static files
 COPY --from=frontend-build /app/build ../frontend/build
+
+# Also copy to nginx accessible location
+RUN mkdir -p /var/www/html && cp -r /app/build/* /var/www/html/
 
 # Create staticfiles directory
 RUN mkdir -p staticfiles
