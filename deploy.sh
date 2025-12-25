@@ -93,84 +93,47 @@ deploy_containers() {
     log_success "Containers deployed successfully"
 }
 
-# Run database migrations
+# Run database migrations (handled by backend container startup)
 run_migrations() {
-    log_info "Running database migrations..."
+    log_info "Database migrations and setup handled by backend container..."
 
-    # Skip readiness check in force/quick deploy modes
+    # In docker-compose mode, backend container handles migrations automatically
+    # Just wait for backend to be healthy (which means migrations completed)
     if [ "${FORCE_DEPLOY:-false}" = "true" ] || [ "${QUICK_DEPLOY:-false}" = "true" ]; then
-        log_warning "Skipping container readiness check (force/quick mode)"
-    else
-        # Check backend container status
-        log_info "Checking backend container..."
-        if docker-compose -f "$COMPOSE_FILE" ps backend 2>/dev/null | grep -q "Up"; then
-            log_success "Backend container is running!"
-            # Give containers more time to fully initialize
-            log_info "Waiting for services to fully initialize..."
-            sleep 10
-
-            # Test database connectivity
-            log_info "Testing database connectivity..."
-            local db_test_attempts=0
-            local max_db_attempts=5
-            while [ $db_test_attempts -lt $max_db_attempts ]; do
-                if docker-compose -f "$COMPOSE_FILE" exec -T backend python manage.py shell -c "from django.db import connection; connection.ensure_connection(); print('DB OK')" >/dev/null 2>&1; then
-                    log_success "Database connectivity test passed"
-                    break
-                else
-                    db_test_attempts=$((db_test_attempts + 1))
-                    if [ $db_test_attempts -lt $max_db_attempts ]; then
-                        log_info "Database not ready yet, waiting... (attempt $db_test_attempts/$max_db_attempts)"
-                        sleep 3
-                    else
-                        log_warning "Database connectivity test failed after $max_db_attempts attempts - continuing anyway"
-                    fi
-                fi
-            done
-        else
-            log_error "Backend container is not running!"
-            log_info "Container status:"
-            docker-compose -f "$COMPOSE_FILE" ps backend
-            return 1
-        fi
+        log_warning "Skipping backend health check (force/quick mode)"
+        return 0
     fi
 
-    # Run migrations with timeout and error handling
-    log_info "Executing database migrations..."
-    local migration_attempts=0
-    local max_migration_attempts=2
+    log_info "Waiting for backend to complete setup and migrations..."
+    local max_wait_attempts=60  # 5 minutes max
+    local attempt=1
 
-    while [ $migration_attempts -lt $max_migration_attempts ]; do
-        migration_attempts=$((migration_attempts + 1))
-
-        if timeout 120 bash -c "
-            docker-compose -f \"$COMPOSE_FILE\" exec -T backend python manage.py migrate --verbosity=1 2>&1
-        "; then
-            log_success "Database migrations completed successfully"
-            break
-        else
-            if [ $migration_attempts -lt $max_migration_attempts ]; then
-                log_warning "Migration attempt $migration_attempts failed, retrying in 5 seconds..."
-                sleep 5
-            else
-                log_error "Database migrations failed after $max_migration_attempts attempts"
-                log_info "This may be due to container connectivity issues"
-                log_info "Try: ./deploy.sh quick-deploy"
-                return 1
+    while [ $attempt -le $max_wait_attempts ]; do
+        # Check if backend container is running and healthy
+        if docker-compose -f "$COMPOSE_FILE" ps backend 2>/dev/null | grep -q "Up"; then
+            # Test if backend health endpoint is responding
+            if curl -f --max-time 5 http://localhost:8000/health/ >/dev/null 2>&1; then
+                log_success "Backend is healthy - migrations and setup completed!"
+                return 0
             fi
         fi
+
+        log_info "Backend setup in progress... (attempt $attempt/$max_wait_attempts)"
+        sleep 5
+        ((attempt++))
     done
+
+    log_error "Backend failed to become healthy after $max_wait_attempts attempts"
+    log_info "Check backend logs: docker-compose -f $COMPOSE_FILE logs backend"
+    return 1
 }
 
-# Collect static files
+# Collect static files (handled by backend container startup)
 collect_static() {
-    log_info "Collecting static files..."
-    if timeout 60 docker-compose -f "$COMPOSE_FILE" exec -T backend python manage.py collectstatic --noinput --clear 2>/dev/null; then
-        log_success "Static files collected"
-    else
-        log_warning "Static files collection failed or timed out (continuing...)"
-        return 0  # Don't fail the deployment
-    fi
+    log_info "Static files collection handled by backend container startup..."
+    # Static files are now collected automatically during backend startup
+    # No need to run separately
+    return 0
 }
 
 # Create superuser (optional)
@@ -272,17 +235,13 @@ main() {
         exit 0
     fi
 
-    # Check if we should skip migrations
+    # Check if we should skip migrations (not recommended in docker-compose mode)
     if [ "${SKIP_MIGRATIONS:-false}" = "true" ]; then
-        log_warning "Skipping database migrations (SKIP_MIGRATIONS=true)"
-        collect_static
+        log_warning "Skipping database migrations (SKIP_MIGRATIONS=true) - backend may not start properly"
     else
-        if run_migrations; then
-            collect_static
-            create_superuser
-        else
-            log_error "Migration failed, but continuing with deployment..."
-            collect_static
+        if ! run_migrations; then
+            log_error "Backend setup failed - check logs and try again"
+            return 1
         fi
     fi
 

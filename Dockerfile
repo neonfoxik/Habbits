@@ -22,7 +22,7 @@ WORKDIR /app
 
 # Install system dependencies (simplified)
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends gcc postgresql-client && \
+    apt-get install -y --no-install-recommends gcc postgresql-client curl && \
     rm -rf /var/lib/apt/lists/* && \
     apt-get clean
 
@@ -51,5 +51,5 @@ USER django
 # Expose port
 EXPOSE 8000
 
-# Run the application
+# Run the application (overridden in docker-compose.prod.yml)
 CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "3", "backend.wsgi:application"]
