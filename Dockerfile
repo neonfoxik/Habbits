@@ -3,49 +3,31 @@
 # Stage 1: Build React app
 FROM node:18-alpine AS frontend-build
 
-# Set working directory for React build
-WORKDIR /app
+# Copy entire frontend directory
+COPY frontend/ ./frontend/
 
-# Verify working directory
-RUN echo "Working directory: $(pwd)"
+# Set working directory to frontend
+WORKDIR /app/frontend
 
-# Check if frontend files exist before copying
-RUN echo "=== CHECKING SOURCE FILES ===" && \
-    ls -la /tmp/ && \
-    echo "Checking if frontend directory exists in build context..."
-
-# Copy frontend files (will fail if files don't exist)
-COPY frontend/package.json ./
-COPY frontend/public ./public
-COPY frontend/src ./src
-COPY frontend/README.md ./README.md
-
-# Verify that all files were copied correctly
-RUN echo "=== VERIFYING COPIED FILES ===" && \
-    echo "Current directory: $(pwd)" && \
-    echo "Root files:" && ls -la && \
-    echo "Package.json exists:" && test -f package.json && echo "✅ package.json found" || echo "❌ package.json missing" && \
-    echo "Public folder:" && ls -la public/ && \
-    echo "Index.html exists:" && test -f public/index.html && echo "✅ index.html found" || echo "❌ index.html missing" && \
-    echo "Src folder:" && ls -la src/
+# Verify React project structure
+RUN echo "=== VERIFYING REACT PROJECT STRUCTURE ===" && \
+    pwd && \
+    ls -la && \
+    test -f package.json && echo "✅ package.json found" || echo "❌ package.json missing" && \
+    test -d public && echo "✅ public/ directory exists" || echo "❌ public/ directory missing" && \
+    test -d src && echo "✅ src/ directory exists" || echo "❌ src/ directory missing" && \
+    test -f public/index.html && echo "✅ public/index.html found" || echo "❌ public/index.html missing"
 
 # Install dependencies (production only)
 RUN npm install --omit=dev --no-package-lock
 
-# Final verification before build
-RUN echo "=== FINAL CHECK BEFORE BUILD ===" && \
-    echo "Working directory: $(pwd)" && \
-    echo "Files in /app:" && ls -la && \
-    echo "Files in public:" && ls -la public/ && \
-    echo "Package.json content:" && cat package.json | head -10
-
 # Build the app
 RUN npm run build
 
-# Verify build output exists
+# Verify build output
 RUN echo "=== BUILD OUTPUT VERIFICATION ===" && \
     ls -la build/ && \
-    test -f build/index.html && echo "✅ index.html exists" || (echo "❌ index.html missing" && exit 1) && \
+    test -f build/index.html && echo "✅ build/index.html exists" || (echo "❌ build/index.html missing" && exit 1) && \
     find build -name "*.js" | head -3 | xargs ls -la && \
     echo "✅ React build successful"
 
@@ -74,7 +56,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY backend/ .
 
 # Copy React build from previous stage
-COPY --from=frontend-build /app/build ../frontend/build
+COPY --from=frontend-build /app/frontend/build ../frontend/build
 
 # Verify React build was copied
 RUN echo "=== REACT BUILD VERIFICATION ===" && \
