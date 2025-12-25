@@ -18,8 +18,8 @@ RUN echo "=== VERIFYING REACT PROJECT STRUCTURE ===" && \
     test -d src && echo "✅ src/ directory exists" || echo "❌ src/ directory missing" && \
     test -f public/index.html && echo "✅ public/index.html found" || echo "❌ public/index.html missing"
 
-# Install dependencies (production only)
-RUN npm install --omit=dev --no-package-lock
+# Install dependencies (production only) - use npm ci for faster, reliable builds
+RUN npm ci --only=production --no-audit --no-fund
 
 # Build the app
 RUN npm run build
