@@ -91,15 +91,35 @@ deploy_containers() {
 run_migrations() {
     log_info "Running database migrations..."
 
-    # Wait for backend container to be ready
+    # Wait for backend container to be ready (reduced timeout)
     log_info "Waiting for backend container to be ready..."
-    for i in {1..30}; do
-        if docker-compose -f "$COMPOSE_FILE" exec -T backend echo "Container ready" &>/dev/null; then
-            break
+    for i in {1..15}; do
+        # Check if container is running
+        if docker-compose -f "$COMPOSE_FILE" ps backend 2>/dev/null | grep -q "Up"; then
+            log_info "Container is up, testing connectivity..."
+            # Try to execute a simple command in the container
+            if timeout 5 docker-compose -f "$COMPOSE_FILE" exec -T backend echo "test" &>/dev/null 2>&1; then
+                log_success "Backend container is ready!"
+                break
+            else
+                log_info "Container not responsive yet..."
+            fi
+        else
+            log_info "Container not started yet..."
         fi
-        sleep 2
-        log_info "Still waiting for backend... ($i/30)"
+        sleep 1
+        log_info "Still waiting for backend... ($i/15)"
     done
+
+    # Final check
+    if ! docker-compose -f "$COMPOSE_FILE" ps backend 2>/dev/null | grep -q "Up"; then
+        log_error "Backend container failed to start!"
+        log_info "Container logs:"
+        docker-compose -f "$COMPOSE_FILE" logs backend | tail -10
+        return 1
+    fi
+
+    log_info "Proceeding with migrations..."
 
     # Run migrations with timeout
     if timeout 60 docker-compose -f "$COMPOSE_FILE" exec -T backend python manage.py migrate; then
@@ -210,11 +230,18 @@ main() {
     check_env_file
     pull_latest_changes
     deploy_containers
-    if run_migrations; then
+    # Check if we should skip migrations
+    if [ "${SKIP_MIGRATIONS:-false}" = "true" ]; then
+        log_warning "Skipping database migrations (SKIP_MIGRATIONS=true)"
         collect_static
-        create_superuser
     else
-        log_error "Skipping static collection and superuser creation due to migration failure"
+        if run_migrations; then
+            collect_static
+            create_superuser
+        else
+            log_error "Migration failed, but continuing with deployment..."
+            collect_static
+        fi
     fi
 
     if health_check; then
@@ -239,6 +266,8 @@ main() {
         echo "   Stop build: ./deploy.sh stop-build"
         echo "   Check build: ./deploy.sh check-build"
         echo "   Run migrations: ./deploy.sh migrate-only"
+        echo "   Skip migrations: ./deploy.sh skip-migrations"
+        echo "   Quick deploy: ./deploy.sh quick-deploy"
         echo "   Backend status: ./deploy.sh backend-status"
         echo "   Stop: ./deploy.sh down"
         echo "   Diagnose: ./diagnose.sh"
@@ -360,16 +389,44 @@ case "${1:-}" in
         log_info "Running database migrations only..."
         run_migrations
         ;;
+    "skip-migrations")
+        log_warning "Skipping database migrations..."
+        log_info "Note: This may cause issues if database schema is outdated"
+        SKIP_MIGRATIONS=true main
+        exit 0
+        ;;
+    "quick-deploy")
+        log_info "Quick deployment (skip migrations and static collection)..."
+        SKIP_MIGRATIONS=true
+        deploy_containers
+        # Skip migrations, static collection, and superuser creation
+        if health_check; then
+            show_status
+            log_success "🎉 Quick deployment completed!"
+            echo
+            log_info "Note: Database migrations were skipped. Run './deploy.sh migrate-only' if needed."
+        fi
+        exit 0
+        ;;
     "backend-status")
         log_info "Checking backend container status..."
         echo "Container status:"
-        docker-compose -f "$COMPOSE_FILE" ps backend
+        docker-compose -f "$COMPOSE_FILE" ps backend 2>/dev/null || echo "No containers running"
+        echo ""
+        echo "Backend container details:"
+        docker ps --filter "name=habits-backend" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" 2>/dev/null || echo "Container not found"
         echo ""
         echo "Backend logs (last 10 lines):"
-        docker-compose -f "$COMPOSE_FILE" logs --tail=10 backend
+        docker-compose -f "$COMPOSE_FILE" logs --tail=10 backend 2>/dev/null || echo "No logs available"
         echo ""
-        echo "Testing backend health:"
-        docker-compose -f "$COMPOSE_FILE" exec -T backend curl -f --max-time 5 http://localhost:8000/health/ 2>/dev/null && echo "✅ Backend is healthy" || echo "❌ Backend health check failed"
+        echo "Testing backend connectivity:"
+        if docker-compose -f "$COMPOSE_FILE" exec -T backend echo "Container is accessible" 2>/dev/null; then
+            echo "✅ Backend container is accessible"
+            echo "Testing Django health:"
+            docker-compose -f "$COMPOSE_FILE" exec -T backend python manage.py check 2>/dev/null && echo "✅ Django check passed" || echo "❌ Django check failed"
+        else
+            echo "❌ Backend container is not accessible"
+        fi
         ;;
     *)
         main
