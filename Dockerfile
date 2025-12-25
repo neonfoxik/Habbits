@@ -3,11 +3,19 @@
 # Stage 1: Build React app
 FROM node:18-alpine AS frontend-build
 
-# Copy package.json (no package-lock.json since we removed it)
+# Install yarn for faster dependency management
+RUN apk add --no-cache yarn
+
+# Copy package.json
 COPY frontend/package.json ./
 
-# Install dependencies - use npm install with production flag for reliable builds
-RUN npm install --production --no-audit --no-fund --prefer-offline --no-progress
+# Install essential dependencies first (for better caching)
+RUN yarn add react react-dom axios || \
+    (npm config set cache /root/.npm && npm install react react-dom axios --no-save)
+
+# Then install all remaining dependencies
+RUN (yarn install --production --silent --no-progress || \
+     (npm install --production --no-audit --no-fund --no-optional --no-progress --silent))
 
 # Copy rest of frontend source
 COPY frontend/public ./public
