@@ -1,0 +1,69 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-habits_db}
+      POSTGRES_USER: ${DB_USER:-habits_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-habits_password}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - habits_network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      - DEBUG=${DEBUG:-False}
+      - SECRET_KEY=${SECRET_KEY}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS}
+      - DATABASE_URL=postgresql://${DB_USER:-habits_user}:${DB_PASSWORD:-habits_password}@db:5432/${DB_NAME:-habits_db}
+      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS}
+    depends_on:
+      - db
+    volumes:
+      - static_files:/app/staticfiles
+      - media_files:/app/media
+    networks:
+      - habits_network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - backend
+    networks:
+      - habits_network
+
+  nginx:
+    image: nginx:alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/sites-enabled:/etc/nginx/sites-enabled:ro
+      - static_files:/app/staticfiles:ro
+      - media_files:/app/media:ro
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - habits_network
+
+volumes:
+  postgres_data:
+  static_files:
+  media_files:
+
+networks:
+  habits_network:
+    driver: bridge

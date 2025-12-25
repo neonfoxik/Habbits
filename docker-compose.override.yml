@@ -1,0 +1,28 @@
+version: '3.8'
+
+# Override file for development
+# This file is automatically merged with docker-compose.yml
+
+services:
+  backend:
+    environment:
+      - DEBUG=True
+    volumes:
+      - ./backend:/app
+    ports:
+      - "8000:8000"
+    command: python manage.py runserver 0.0.0.0:8000
+
+  frontend:
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports:
+      - "3000:3000"
+    environment:
+      - REACT_APP_API_URL=http://localhost:8000/api
+    command: npm start
+
+  nginx:
+    profiles:
+      - production

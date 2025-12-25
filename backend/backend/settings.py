@@ -20,12 +20,13 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-8ap1wr$_vdz%=*+rfzme296*@8hvuubw#e9ju+ydqg6**d6z8y'
+import os
+SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-8ap1wr$_vdz%=*+rfzme296*@8hvuubw#e9ju+ydqg6**d6z8y')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
 
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
 
 
 # Application definition
@@ -148,20 +149,32 @@ MEDIA_ROOT = BASE_DIR / 'media'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # CORS settings
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "http://localhost:8000",
-    "http://127.0.0.1:8000",
-]
+CORS_ALLOWED_ORIGINS = os.getenv('CORS_ALLOWED_ORIGINS', 'http://localhost:3000,http://127.0.0.1:3000').split(',')
 
 CORS_ALLOW_CREDENTIALS = True
 
-# Для разработки разрешаем все origins
-CORS_ALLOW_ALL_ORIGINS = True
+# Для разработки разрешаем все origins (только в DEBUG режиме)
+if DEBUG:
+    CORS_ALLOW_ALL_ORIGINS = True
+else:
+    CORS_ALLOW_ALL_ORIGINS = False
 
 # React build files
 REACT_APP_DIR = BASE_DIR.parent / 'frontend' / 'build'
 
 # Templates directories for React build
 TEMPLATES[0]['DIRS'] = [REACT_APP_DIR]
+
+# Security settings for production
+if not DEBUG:
+    SECURE_SSL_REDIRECT = os.getenv('SECURE_SSL_REDIRECT', 'False').lower() == 'true'
+    SECURE_HSTS_SECONDS = int(os.getenv('SECURE_HSTS_SECONDS', '31536000'))
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = os.getenv('SECURE_HSTS_INCLUDE_SUBDOMAINS', 'True').lower() == 'true'
+    SECURE_HSTS_PRELOAD = os.getenv('SECURE_HSTS_PRELOAD', 'True').lower() == 'true'
+    SECURE_CONTENT_TYPE_NOSNIFF = os.getenv('SECURE_CONTENT_TYPE_NOSNIFF', 'True').lower() == 'true'
+    SECURE_BROWSER_XSS_FILTER = os.getenv('SECURE_BROWSER_XSS_FILTER', 'True').lower() == 'true'
+    SESSION_COOKIE_SECURE = os.getenv('SESSION_COOKIE_SECURE', 'False').lower() == 'true'
+    CSRF_COOKIE_SECURE = os.getenv('CSRF_COOKIE_SECURE', 'False').lower() == 'true'
+
+    # Additional security middleware
+    MIDDLEWARE.insert(1, 'django.middleware.security.SecurityMiddleware')
