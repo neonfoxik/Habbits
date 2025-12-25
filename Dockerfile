@@ -34,7 +34,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY backend/ .
 
 # Copy React build from previous stage
-COPY --from=frontend-build /app/frontend/build ../frontend/build
+COPY --from=frontend-build /app/build ../frontend/build
 
 # Verify React build was copied
 RUN echo "=== REACT BUILD VERIFICATION ===" && \
