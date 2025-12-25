@@ -3,8 +3,8 @@
 # Stage 1: Build React app
 FROM node:18-alpine AS frontend-build
 
-# Copy package files first (for better Docker layer caching)
-COPY frontend/package.json frontend/package-lock.json ./
+# Copy package.json (no package-lock.json since we removed it)
+COPY frontend/package.json ./
 
 # Install dependencies - use npm install with production flag for reliable builds
 RUN npm install --production --no-audit --no-fund --prefer-offline --no-progress
