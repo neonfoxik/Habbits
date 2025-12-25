@@ -6,8 +6,8 @@ FROM node:18-alpine AS frontend-build
 # Copy package files first (for better Docker layer caching)
 COPY frontend/package.json frontend/package-lock.json ./
 
-# Install dependencies (production only) - use npm ci for faster, reliable builds
-RUN npm ci --only=production --no-audit --no-fund --prefer-offline --no-progress
+# Install dependencies - use npm install with production flag for reliable builds
+RUN npm install --production --no-audit --no-fund --prefer-offline --no-progress
 
 # Copy rest of frontend source
 COPY frontend/public ./public
