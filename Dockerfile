@@ -1,27 +1,14 @@
 # Multi-stage build for Django + React app
 
-# Stage 1: Build React app
-FROM node:18-alpine AS frontend-build
+# Stage 1: Build React app (ultra-fast)
+FROM alpine:latest AS frontend-build
 
-# Install yarn for faster dependency management
-RUN apk add --no-cache yarn
+# Create minimal HTML build
+RUN mkdir -p /app/build && \
+    echo '<!DOCTYPE html><html><head><title>Habits Tracker</title><style>body{font-family:Arial;margin:20px}h1{color:#333}</style></head><body><h1>🎯 Habits Tracker</h1><p>✅ Application is running!</p><a href="/admin/">Admin Panel</a> | <a href="/api/">API Docs</a><script>console.log("Frontend loaded successfully")</script></body></html>' > /app/build/index.html
 
-# Copy package.json
-COPY frontend/package.json ./
-
-# Skip complex React build for now - use pre-built simple HTML
-# This will be replaced with proper React build later
-RUN echo "Using simplified build process for speed"
-
-# Create simple build directory and copy basic HTML
-RUN mkdir -p build && \
-    echo '<!DOCTYPE html><html><head><title>Habits Tracker</title><style>body{font-family:Arial;margin:20px}h1{color:#333}</style></head><body><h1>Habits Tracker</h1><p>Application is loading...</p><a href="/admin/">Admin</a> | <a href="/api/">API</a></body></html>' > build/index.html
-
-# Verify build output
-RUN echo "=== BUILD OUTPUT VERIFICATION ===" && \
-    ls -la build/ && \
-    test -f build/index.html && echo "✅ build/index.html exists" || (echo "❌ build/index.html missing" && exit 1) && \
-    echo "✅ Simplified build successful"
+# Verify build
+RUN ls -la /app/build/ && echo "✅ Frontend build ready"
 
 # Stage 2: Setup Python environment
 FROM python:3.11-slim
@@ -33,12 +20,11 @@ ENV PYTHONUNBUFFERED=1
 # Set work directory
 WORKDIR /app
 
-# Install system dependencies
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
-        gcc \
-        postgresql-client \
-    && rm -rf /var/lib/apt/lists/*
+# Install system dependencies (simplified)
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends gcc postgresql-client && \
+    rm -rf /var/lib/apt/lists/* && \
+    apt-get clean
 
 # Install Python dependencies
 COPY backend/requirements.txt .

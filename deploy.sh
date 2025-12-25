@@ -73,10 +73,15 @@ deploy_containers() {
     # Stop existing containers
     docker-compose -f "$COMPOSE_FILE" down || true
 
-    # Build images
-    docker-compose -f "$COMPOSE_FILE" build --no-cache
+    # Build images with timeout
+    log_info "Building Docker images..."
+    timeout 300 docker-compose -f "$COMPOSE_FILE" build --no-cache || {
+        log_error "Build timed out after 5 minutes"
+        exit 1
+    }
 
     # Start containers
+    log_info "Starting containers..."
     docker-compose -f "$COMPOSE_FILE" up -d
 
     log_success "Containers deployed successfully"
@@ -208,6 +213,8 @@ main() {
         echo "   Fix nginx: ./deploy.sh fix-nginx"
         echo "   Quick rebuild: ./deploy.sh rebuild-frontend"
         echo "   Full rebuild: ./deploy.sh rebuild"
+        echo "   Stop build: ./deploy.sh stop-build"
+        echo "   Check build: ./deploy.sh check-build"
         echo "   Stop: ./deploy.sh down"
         echo "   Diagnose: ./diagnose.sh"
     else
@@ -270,8 +277,17 @@ case "${1:-}" in
         ;;
     "rebuild-frontend")
         log_info "Fast frontend rebuild..."
-        docker-compose -f "$COMPOSE_FILE" build --no-cache backend
+        timeout 120 docker-compose -f "$COMPOSE_FILE" build --no-cache backend || {
+            log_error "Frontend rebuild timed out"
+            exit 1
+        }
         docker-compose -f "$COMPOSE_FILE" up -d
+        ;;
+    "stop-build")
+        log_info "Stopping any running builds..."
+        docker-compose -f "$COMPOSE_FILE" down
+        docker buildx prune -f 2>/dev/null || true
+        log_success "Build stopped"
         ;;
     "clean-db")
         log_warning "This will DELETE all database data!"
@@ -301,6 +317,19 @@ case "${1:-}" in
             log_success "Database cleaned. Run './deploy.sh' to restart."
         fi
         exit 0
+        ;;
+    "check-build")
+        log_info "Checking Docker build setup..."
+        echo "Docker version:"
+        docker --version 2>/dev/null || echo "Docker not found"
+        echo "Docker Compose version:"
+        docker-compose --version 2>/dev/null || echo "Docker Compose not found"
+        echo "Checking Dockerfile:"
+        test -f Dockerfile && echo "✅ Dockerfile exists" || echo "❌ Dockerfile missing"
+        echo "Checking docker-compose.prod.yml:"
+        test -f docker-compose.prod.yml && echo "✅ docker-compose.prod.yml exists" || echo "❌ docker-compose.prod.yml missing"
+        echo "Checking .env:"
+        test -f .env && echo "✅ .env exists" || echo "❌ .env missing"
         ;;
     *)
         main
