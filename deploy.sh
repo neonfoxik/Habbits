@@ -36,11 +36,17 @@ log_error() {
 # Check if .env file exists
 check_env_file() {
     if [ ! -f "$ENV_FILE" ]; then
-        log_error ".env file not found! Please create it from env.example"
-        log_info "Run: cp env.example .env"
-        exit 1
+        log_warning ".env file not found! Creating from env.example..."
+        if [ -f "env.example" ]; then
+            cp env.example .env
+            log_success ".env file created from env.example"
+        else
+            log_error "Neither .env nor env.example found!"
+            exit 1
+        fi
+    else
+        log_success ".env file found"
     fi
-    log_success ".env file found"
 }
 
 # Check if required commands are available
@@ -99,16 +105,28 @@ run_migrations() {
         log_info "Checking backend container..."
         if docker-compose -f "$COMPOSE_FILE" ps backend 2>/dev/null | grep -q "Up"; then
             log_success "Backend container is running!"
-            # Give it a moment to fully initialize
-            sleep 5
+            # Give containers more time to fully initialize
+            log_info "Waiting for services to fully initialize..."
+            sleep 10
 
-            # Test database connectivity through health check
+            # Test database connectivity
             log_info "Testing database connectivity..."
-            if timeout 30 docker-compose -f "$COMPOSE_FILE" exec -T backend python manage.py check --database default >/dev/null 2>&1; then
-                log_success "Database connectivity test passed"
-            else
-                log_warning "Database connectivity test failed - continuing anyway"
-            fi
+            local db_test_attempts=0
+            local max_db_attempts=5
+            while [ $db_test_attempts -lt $max_db_attempts ]; do
+                if docker-compose -f "$COMPOSE_FILE" exec -T backend python manage.py shell -c "from django.db import connection; connection.ensure_connection(); print('DB OK')" >/dev/null 2>&1; then
+                    log_success "Database connectivity test passed"
+                    break
+                else
+                    db_test_attempts=$((db_test_attempts + 1))
+                    if [ $db_test_attempts -lt $max_db_attempts ]; then
+                        log_info "Database not ready yet, waiting... (attempt $db_test_attempts/$max_db_attempts)"
+                        sleep 3
+                    else
+                        log_warning "Database connectivity test failed after $max_db_attempts attempts - continuing anyway"
+                    fi
+                fi
+            done
         else
             log_error "Backend container is not running!"
             log_info "Container status:"
@@ -119,16 +137,29 @@ run_migrations() {
 
     # Run migrations with timeout and error handling
     log_info "Executing database migrations..."
-    if timeout 120 bash -c "
-        docker-compose -f \"$COMPOSE_FILE\" exec -T backend python manage.py migrate --verbosity=1 2>&1
-    "; then
-        log_success "Database migrations completed successfully"
-    else
-        log_error "Database migrations failed or timed out"
-        log_info "This may be due to container connectivity issues"
-        log_info "Try: ./deploy.sh quick-deploy"
-        return 1
-    fi
+    local migration_attempts=0
+    local max_migration_attempts=2
+
+    while [ $migration_attempts -lt $max_migration_attempts ]; do
+        migration_attempts=$((migration_attempts + 1))
+
+        if timeout 120 bash -c "
+            docker-compose -f \"$COMPOSE_FILE\" exec -T backend python manage.py migrate --verbosity=1 2>&1
+        "; then
+            log_success "Database migrations completed successfully"
+            break
+        else
+            if [ $migration_attempts -lt $max_migration_attempts ]; then
+                log_warning "Migration attempt $migration_attempts failed, retrying in 5 seconds..."
+                sleep 5
+            else
+                log_error "Database migrations failed after $max_migration_attempts attempts"
+                log_info "This may be due to container connectivity issues"
+                log_info "Try: ./deploy.sh quick-deploy"
+                return 1
+            fi
+        fi
+    done
 }
 
 # Collect static files
@@ -457,9 +488,21 @@ case "${1:-}" in
         fi
         echo "Testing network connectivity:"
         if docker-compose -f "$COMPOSE_FILE" exec -T backend /bin/sh -c "ping -c 1 db" 2>/dev/null >/dev/null; then
-            echo "✅ Container can reach database"
+            echo "✅ Container can reach database via ping"
         else
-            echo "❌ Container cannot reach database"
+            echo "❌ Container cannot reach database via ping"
+        fi
+        echo "Testing database port connectivity:"
+        if docker-compose -f "$COMPOSE_FILE" exec -T backend /bin/sh -c "nc -z db 5432" 2>/dev/null >/dev/null; then
+            echo "✅ Database port 5432 is accessible"
+        else
+            echo "❌ Database port 5432 is not accessible"
+        fi
+        echo "Testing Django database connection:"
+        if docker-compose -f "$COMPOSE_FILE" exec -T backend python manage.py shell -c "from django.db import connection; connection.ensure_connection(); print('✅ Django can connect to database')" 2>/dev/null; then
+            echo "✅ Django database connection works"
+        else
+            echo "❌ Django database connection fails"
         fi
         ;;
     *)
