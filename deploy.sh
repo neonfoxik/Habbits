@@ -206,6 +206,8 @@ main() {
         echo "   Restart: ./deploy.sh restart"
         echo "   Reload nginx: ./deploy.sh reload-nginx"
         echo "   Fix nginx: ./deploy.sh fix-nginx"
+        echo "   Quick rebuild: ./deploy.sh rebuild-frontend"
+        echo "   Full rebuild: ./deploy.sh rebuild"
         echo "   Stop: ./deploy.sh down"
         echo "   Diagnose: ./diagnose.sh"
     else
@@ -263,7 +265,12 @@ case "${1:-}" in
         docker-compose -f "$COMPOSE_FILE" down
         docker system prune -f
         docker volume prune -f
-        docker-compose -f "$COMPOSE_FILE" build --no-cache
+        docker-compose -f "$COMPOSE_FILE" build --no-cache --parallel
+        docker-compose -f "$COMPOSE_FILE" up -d
+        ;;
+    "rebuild-frontend")
+        log_info "Fast frontend rebuild..."
+        docker-compose -f "$COMPOSE_FILE" build --no-cache backend
         docker-compose -f "$COMPOSE_FILE" up -d
         ;;
     "clean-db")

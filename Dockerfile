@@ -3,23 +3,27 @@
 # Stage 1: Build React app
 FROM node:18-alpine AS frontend-build
 
-# Copy entire frontend directory
-COPY frontend/ ./frontend/
+# Copy package files first (for better Docker layer caching)
+COPY frontend/package.json frontend/package-lock.json ./
 
-# Set working directory to frontend
-WORKDIR /app/frontend
+# Install dependencies (production only) - use npm ci for faster, reliable builds
+RUN npm ci --only=production --no-audit --no-fund --prefer-offline --no-progress
+
+# Copy rest of frontend source
+COPY frontend/public ./public
+COPY frontend/src ./src
+COPY frontend/README.md ./
 
 # Verify React project structure
 RUN echo "=== VERIFYING REACT PROJECT STRUCTURE ===" && \
     pwd && \
     ls -la && \
     test -f package.json && echo "✅ package.json found" || echo "❌ package.json missing" && \
+    test -f package-lock.json && echo "✅ package-lock.json found" || echo "❌ package-lock.json missing" && \
     test -d public && echo "✅ public/ directory exists" || echo "❌ public/ directory missing" && \
     test -d src && echo "✅ src/ directory exists" || echo "❌ src/ directory missing" && \
+    test -d node_modules && echo "✅ node_modules exists" || echo "❌ node_modules missing" && \
     test -f public/index.html && echo "✅ public/index.html found" || echo "❌ public/index.html missing"
-
-# Install dependencies (production only) - use npm ci for faster, reliable builds
-RUN npm ci --only=production --no-audit --no-fund
 
 # Build the app
 RUN npm run build
