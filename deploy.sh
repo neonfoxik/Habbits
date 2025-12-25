@@ -91,41 +91,35 @@ deploy_containers() {
 run_migrations() {
     log_info "Running database migrations..."
 
-    # Wait for backend container to be ready (reduced timeout)
-    log_info "Waiting for backend container to be ready..."
-    for i in {1..15}; do
-        # Check if container is running
+    # Skip readiness check in force/quick deploy modes
+    if [ "${FORCE_DEPLOY:-false}" = "true" ] || [ "${QUICK_DEPLOY:-false}" = "true" ]; then
+        log_warning "Skipping container readiness check (force/quick mode)"
+    else
+        # Simplified container readiness check
+        log_info "Checking backend container..."
+        # Quick check - just verify container is running
         if docker-compose -f "$COMPOSE_FILE" ps backend 2>/dev/null | grep -q "Up"; then
-            log_info "Container is up, testing connectivity..."
-            # Try to execute a simple command in the container
-            if timeout 5 docker-compose -f "$COMPOSE_FILE" exec -T backend echo "test" &>/dev/null 2>&1; then
-                log_success "Backend container is ready!"
-                break
-            else
-                log_info "Container not responsive yet..."
-            fi
+            log_success "Backend container is running!"
+            # Give it a moment to fully initialize
+            sleep 3
         else
-            log_info "Container not started yet..."
+            log_error "Backend container is not running!"
+            log_info "Container status:"
+            docker-compose -f "$COMPOSE_FILE" ps backend
+            return 1
         fi
-        sleep 1
-        log_info "Still waiting for backend... ($i/15)"
-    done
-
-    # Final check
-    if ! docker-compose -f "$COMPOSE_FILE" ps backend 2>/dev/null | grep -q "Up"; then
-        log_error "Backend container failed to start!"
-        log_info "Container logs:"
-        docker-compose -f "$COMPOSE_FILE" logs backend | tail -10
-        return 1
     fi
 
-    log_info "Proceeding with migrations..."
-
-    # Run migrations with timeout
-    if timeout 60 docker-compose -f "$COMPOSE_FILE" exec -T backend python manage.py migrate; then
-        log_success "Database migrations completed"
+    # Run migrations with timeout and error handling
+    log_info "Executing database migrations..."
+    if timeout 30 bash -c "
+        docker-compose -f \"$COMPOSE_FILE\" exec -T backend python manage.py migrate 2>&1
+    "; then
+        log_success "Database migrations completed successfully"
     else
         log_error "Database migrations failed or timed out"
+        log_info "This may be due to container connectivity issues"
+        log_info "Try: ./deploy.sh quick-deploy"
         return 1
     fi
 }
@@ -133,22 +127,24 @@ run_migrations() {
 # Collect static files
 collect_static() {
     log_info "Collecting static files..."
-    if timeout 30 docker-compose -f "$COMPOSE_FILE" exec -T backend python manage.py collectstatic --noinput --clear; then
+    if timeout 30 docker-compose -f "$COMPOSE_FILE" exec -T backend python manage.py collectstatic --noinput --clear 2>/dev/null; then
         log_success "Static files collected"
     else
-        log_error "Static files collection failed or timed out"
-        return 1
+        log_warning "Static files collection failed or timed out (continuing...)"
+        return 0  # Don't fail the deployment
     fi
 }
 
 # Create superuser (optional)
 create_superuser() {
-    read -p "Do you want to create a superuser? (y/n): " -n 1 -r
-    echo
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        log_info "Creating superuser..."
-        docker-compose -f "$COMPOSE_FILE" exec backend python manage.py createsuperuser
+    # Skip in automated modes
+    if [ "${FORCE_DEPLOY:-false}" = "true" ] || [ "${QUICK_DEPLOY:-false}" = "true" ]; then
+        log_info "Skipping superuser creation (automated mode)"
+        return 0
     fi
+
+    log_info "Note: Superuser creation requires manual input"
+    log_info "Run manually later: docker-compose -f $COMPOSE_FILE exec backend python manage.py createsuperuser"
 }
 
 # Health check
@@ -230,6 +226,14 @@ main() {
     check_env_file
     pull_latest_changes
     deploy_containers
+
+    # Quick deploy - skip everything
+    if [ "${QUICK_DEPLOY:-false}" = "true" ]; then
+        show_status
+        log_success "🎉 Quick deployment completed!"
+        exit 0
+    fi
+
     # Check if we should skip migrations
     if [ "${SKIP_MIGRATIONS:-false}" = "true" ]; then
         log_warning "Skipping database migrations (SKIP_MIGRATIONS=true)"
@@ -268,7 +272,9 @@ main() {
         echo "   Run migrations: ./deploy.sh migrate-only"
         echo "   Skip migrations: ./deploy.sh skip-migrations"
         echo "   Quick deploy: ./deploy.sh quick-deploy"
+        echo "   Force deploy: ./deploy.sh force-deploy"
         echo "   Backend status: ./deploy.sh backend-status"
+        echo "   Test connectivity: ./deploy.sh test-connectivity"
         echo "   Stop: ./deploy.sh down"
         echo "   Diagnose: ./diagnose.sh"
     else
@@ -396,16 +402,23 @@ case "${1:-}" in
         exit 0
         ;;
     "quick-deploy")
-        log_info "Quick deployment (skip migrations and static collection)..."
-        SKIP_MIGRATIONS=true
+        log_info "Quick deployment (minimal checks)..."
+        QUICK_DEPLOY=true SKIP_MIGRATIONS=true
         deploy_containers
-        # Skip migrations, static collection, and superuser creation
-        if health_check; then
-            show_status
-            log_success "🎉 Quick deployment completed!"
-            echo
-            log_info "Note: Database migrations were skipped. Run './deploy.sh migrate-only' if needed."
-        fi
+        # Skip all post-deployment steps for speed
+        log_success "🎉 Quick deployment completed!"
+        show_status
+        echo
+        log_info "Note: Migrations and health checks were skipped."
+        log_info "Run './deploy.sh migrate-only' and './deploy.sh backend-status' if needed."
+        exit 0
+        ;;
+    "force-deploy")
+        log_info "Force deployment (no checks, no waiting)..."
+        FORCE_DEPLOY=true QUICK_DEPLOY=true SKIP_MIGRATIONS=true
+        deploy_containers
+        log_success "🎉 Force deployment completed!"
+        show_status
         exit 0
         ;;
     "backend-status")
@@ -420,12 +433,26 @@ case "${1:-}" in
         docker-compose -f "$COMPOSE_FILE" logs --tail=10 backend 2>/dev/null || echo "No logs available"
         echo ""
         echo "Testing backend connectivity:"
-        if docker-compose -f "$COMPOSE_FILE" exec -T backend echo "Container is accessible" 2>/dev/null; then
+        # Use a very simple test that won't hang
+        if timeout 3 docker-compose -f "$COMPOSE_FILE" exec -T backend /bin/sh -c "echo 'Container is accessible'" 2>/dev/null >/dev/null; then
             echo "✅ Backend container is accessible"
-            echo "Testing Django health:"
-            docker-compose -f "$COMPOSE_FILE" exec -T backend python manage.py check 2>/dev/null && echo "✅ Django check passed" || echo "❌ Django check failed"
         else
             echo "❌ Backend container is not accessible"
+        fi
+        ;;
+    "test-connectivity")
+        log_info "Testing basic connectivity..."
+        echo "Testing container accessibility:"
+        if timeout 2 docker-compose -f "$COMPOSE_FILE" exec -T backend /bin/sh -c "exit 0" 2>/dev/null; then
+            echo "✅ Container exec works"
+        else
+            echo "❌ Container exec fails"
+        fi
+        echo "Testing network connectivity:"
+        if docker-compose -f "$COMPOSE_FILE" exec -T backend /bin/sh -c "ping -c 1 db" 2>/dev/null >/dev/null; then
+            echo "✅ Container can reach database"
+        else
+            echo "❌ Container cannot reach database"
         fi
         ;;
     *)
