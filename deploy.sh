@@ -95,13 +95,20 @@ run_migrations() {
     if [ "${FORCE_DEPLOY:-false}" = "true" ] || [ "${QUICK_DEPLOY:-false}" = "true" ]; then
         log_warning "Skipping container readiness check (force/quick mode)"
     else
-        # Simplified container readiness check
+        # Check backend container status
         log_info "Checking backend container..."
-        # Quick check - just verify container is running
         if docker-compose -f "$COMPOSE_FILE" ps backend 2>/dev/null | grep -q "Up"; then
             log_success "Backend container is running!"
             # Give it a moment to fully initialize
-            sleep 3
+            sleep 5
+
+            # Test database connectivity through health check
+            log_info "Testing database connectivity..."
+            if timeout 30 docker-compose -f "$COMPOSE_FILE" exec -T backend python manage.py check --database default >/dev/null 2>&1; then
+                log_success "Database connectivity test passed"
+            else
+                log_warning "Database connectivity test failed - continuing anyway"
+            fi
         else
             log_error "Backend container is not running!"
             log_info "Container status:"
@@ -112,8 +119,8 @@ run_migrations() {
 
     # Run migrations with timeout and error handling
     log_info "Executing database migrations..."
-    if timeout 30 bash -c "
-        docker-compose -f \"$COMPOSE_FILE\" exec -T backend python manage.py migrate 2>&1
+    if timeout 120 bash -c "
+        docker-compose -f \"$COMPOSE_FILE\" exec -T backend python manage.py migrate --verbosity=1 2>&1
     "; then
         log_success "Database migrations completed successfully"
     else
@@ -127,7 +134,7 @@ run_migrations() {
 # Collect static files
 collect_static() {
     log_info "Collecting static files..."
-    if timeout 30 docker-compose -f "$COMPOSE_FILE" exec -T backend python manage.py collectstatic --noinput --clear 2>/dev/null; then
+    if timeout 60 docker-compose -f "$COMPOSE_FILE" exec -T backend python manage.py collectstatic --noinput --clear 2>/dev/null; then
         log_success "Static files collected"
     else
         log_warning "Static files collection failed or timed out (continuing...)"

@@ -41,11 +41,8 @@ RUN echo "=== REACT BUILD VERIFICATION ===" && \
     ls -la ../frontend/build/ && \
     test -f ../frontend/build/index.html && echo "✅ React build copied successfully" || echo "❌ React build copy failed"
 
-# Create staticfiles directory
+# Create staticfiles directory (will be populated during deployment)
 RUN mkdir -p staticfiles
-
-# Collect static files
-RUN python manage.py collectstatic --noinput
 
 # Create a non-root user
 RUN adduser --disabled-password --gecos '' django && chown -R django:django /app
