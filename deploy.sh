@@ -90,15 +90,35 @@ deploy_containers() {
 # Run database migrations
 run_migrations() {
     log_info "Running database migrations..."
-    docker-compose -f "$COMPOSE_FILE" exec -T backend python manage.py migrate
-    log_success "Database migrations completed"
+
+    # Wait for backend container to be ready
+    log_info "Waiting for backend container to be ready..."
+    for i in {1..30}; do
+        if docker-compose -f "$COMPOSE_FILE" exec -T backend echo "Container ready" &>/dev/null; then
+            break
+        fi
+        sleep 2
+        log_info "Still waiting for backend... ($i/30)"
+    done
+
+    # Run migrations with timeout
+    if timeout 60 docker-compose -f "$COMPOSE_FILE" exec -T backend python manage.py migrate; then
+        log_success "Database migrations completed"
+    else
+        log_error "Database migrations failed or timed out"
+        return 1
+    fi
 }
 
 # Collect static files
 collect_static() {
     log_info "Collecting static files..."
-    docker-compose -f "$COMPOSE_FILE" exec -T backend python manage.py collectstatic --noinput --clear
-    log_success "Static files collected"
+    if timeout 30 docker-compose -f "$COMPOSE_FILE" exec -T backend python manage.py collectstatic --noinput --clear; then
+        log_success "Static files collected"
+    else
+        log_error "Static files collection failed or timed out"
+        return 1
+    fi
 }
 
 # Create superuser (optional)
@@ -190,9 +210,12 @@ main() {
     check_env_file
     pull_latest_changes
     deploy_containers
-    run_migrations
-    collect_static
-    create_superuser
+    if run_migrations; then
+        collect_static
+        create_superuser
+    else
+        log_error "Skipping static collection and superuser creation due to migration failure"
+    fi
 
     if health_check; then
         show_status
@@ -215,6 +238,8 @@ main() {
         echo "   Full rebuild: ./deploy.sh rebuild"
         echo "   Stop build: ./deploy.sh stop-build"
         echo "   Check build: ./deploy.sh check-build"
+        echo "   Run migrations: ./deploy.sh migrate-only"
+        echo "   Backend status: ./deploy.sh backend-status"
         echo "   Stop: ./deploy.sh down"
         echo "   Diagnose: ./diagnose.sh"
     else
@@ -330,6 +355,21 @@ case "${1:-}" in
         test -f docker-compose.prod.yml && echo "✅ docker-compose.prod.yml exists" || echo "❌ docker-compose.prod.yml missing"
         echo "Checking .env:"
         test -f .env && echo "✅ .env exists" || echo "❌ .env missing"
+        ;;
+    "migrate-only")
+        log_info "Running database migrations only..."
+        run_migrations
+        ;;
+    "backend-status")
+        log_info "Checking backend container status..."
+        echo "Container status:"
+        docker-compose -f "$COMPOSE_FILE" ps backend
+        echo ""
+        echo "Backend logs (last 10 lines):"
+        docker-compose -f "$COMPOSE_FILE" logs --tail=10 backend
+        echo ""
+        echo "Testing backend health:"
+        docker-compose -f "$COMPOSE_FILE" exec -T backend curl -f --max-time 5 http://localhost:8000/health/ 2>/dev/null && echo "✅ Backend is healthy" || echo "❌ Backend health check failed"
         ;;
     *)
         main
