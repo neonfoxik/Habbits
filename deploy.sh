@@ -251,6 +251,21 @@ case "${1:-}" in
         log_info "Recreating nginx container with new configuration..."
         docker-compose -f "$COMPOSE_FILE" up -d --force-recreate nginx
         ;;
+    "network-test")
+        log_info "Testing network connectivity between containers..."
+        echo "Testing backend connectivity:"
+        docker-compose -f "$COMPOSE_FILE" exec -T backend curl -f --max-time 5 http://localhost:8000/health/ && echo "✅ Backend self-test passed" || echo "❌ Backend self-test failed"
+        echo "Testing nginx to backend connectivity:"
+        docker-compose -f "$COMPOSE_FILE" exec -T nginx curl -f --max-time 5 http://habits-backend:8000/health/ && echo "✅ Nginx to backend connection works" || echo "❌ Nginx to backend connection failed"
+        ;;
+    "rebuild")
+        log_info "Full rebuild: stopping, cleaning, rebuilding..."
+        docker-compose -f "$COMPOSE_FILE" down
+        docker system prune -f
+        docker volume prune -f
+        docker-compose -f "$COMPOSE_FILE" build --no-cache
+        docker-compose -f "$COMPOSE_FILE" up -d
+        ;;
     "clean-db")
         log_warning "This will DELETE all database data!"
         read -p "Are you sure? (yes/no): " -r
