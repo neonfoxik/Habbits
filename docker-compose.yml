@@ -50,16 +50,26 @@ services:
       - ./nginx/sites-enabled:/etc/nginx/sites-enabled:ro
       - static_files:/app/staticfiles:ro
       - media_files:/app/media:ro
+      - letsencrypt:/etc/letsencrypt:ro
     depends_on:
       - backend
       - frontend
     networks:
       - habits_network
 
+  certbot:
+    image: certbot/certbot
+    restart: unless-stopped
+    volumes:
+      - letsencrypt:/etc/letsencrypt
+      - ./certbot/www:/var/www/certbot
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
+
 volumes:
   postgres_data:
   static_files:
   media_files:
+  letsencrypt:
 
 networks:
   habits_network:
