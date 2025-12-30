@@ -18,7 +18,9 @@ COPY . .
 
 # Create non-root user
 RUN useradd --create-home --shell /bin/bash app \
-    && chown -R app:app /app
+    && chown -R app:app /app \
+    && mkdir -p /app/staticfiles /app/media \
+    && chown -R app:app /app/staticfiles /app/media
 USER app
 
 # Expose port

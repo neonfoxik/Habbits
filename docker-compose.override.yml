@@ -7,11 +7,16 @@ services:
   backend:
     environment:
       - DEBUG=True
+      - SECRET_KEY=django-insecure-dev-key-change-in-production
+      - ALLOWED_HOSTS=localhost,127.0.0.1,0.0.0.0
+      - DB_NAME=habits_db
+      - DB_USER=habits_user
+      - DB_PASSWORD=habits_password
     volumes:
       - ./backend:/app
     ports:
       - "8000:8000"
-    command: python manage.py runserver 0.0.0.0:8000
+    command: sh -c "mkdir -p /app/staticfiles && python manage.py runserver 0.0.0.0:8000"
 
   frontend:
     volumes:
