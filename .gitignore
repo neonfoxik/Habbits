@@ -39,8 +39,10 @@ node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-build/
-dist/
+
+# Frontend build artifacts (keep package-lock.json)
+frontend/build/
+frontend/dist/
 
 # IDE
 .vscode/
