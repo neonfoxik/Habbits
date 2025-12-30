@@ -1,5 +1,9 @@
 # Development stage
-FROM node:18-alpine
+FROM node:18
+
+# Update package manager and install latest npm
+RUN apt-get update && apt-get install -y libc6-dev
+RUN npm install -g npm@latest
 
 WORKDIR /app
 
@@ -7,9 +11,7 @@ WORKDIR /app
 COPY .npmrc package*.json ./
 
 # Install dependencies
-# Use npm ci if package-lock.json exists (faster and more reliable)
-# Otherwise use npm install
-RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
+RUN npm install --no-cache --prefer-online
 
 # Copy source code
 COPY . .
