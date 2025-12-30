@@ -10,7 +10,7 @@ WORKDIR /app
 COPY .npmrc package*.json ./
 
 # Install dependencies
-RUN npm install --no-cache --prefer-online
+RUN npm install
 
 # Copy source code
 COPY . .
