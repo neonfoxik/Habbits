@@ -39,7 +39,7 @@ frontend-install: ## Install frontend dependencies
 	cd frontend && npm install
 
 frontend-build: ## Build frontend for production
-	cd frontend && npm run build
+	docker build -t habits-frontend ./frontend
 
 backend-test: ## Run backend tests
 	docker-compose exec backend python manage.py test

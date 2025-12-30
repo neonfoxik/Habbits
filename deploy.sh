@@ -58,12 +58,9 @@ check_env_file() {
 deploy_services() {
     print_status "Building and starting services..."
 
-    # Build frontend first
+    # Build frontend using Docker
     print_status "Building frontend..."
-    cd frontend
-    npm install
-    npm run build
-    cd ..
+    docker build -t habits-frontend ./frontend
 
     # Start all services
     print_status "Starting Docker services..."
@@ -123,6 +120,10 @@ stop_services() {
 update_application() {
     print_status "Updating application..."
     git pull origin main 2>/dev/null || print_warning "No git repository found, skipping pull."
+
+    # Build frontend
+    print_status "Building frontend..."
+    docker build -t habits-frontend ./frontend
 
     # Rebuild and restart
     docker-compose down

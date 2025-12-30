@@ -33,9 +33,7 @@ services:
       - habits_network
 
   frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
+    image: habits-frontend:latest
     restart: unless-stopped
     depends_on:
       - backend
