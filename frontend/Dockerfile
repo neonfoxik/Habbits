@@ -3,8 +3,8 @@ FROM node:18-alpine
 
 WORKDIR /app
 
-# Copy package files
-COPY package*.json ./
+# Copy npm config and package files
+COPY .npmrc package*.json ./
 
 # Install dependencies
 # Use npm ci if package-lock.json exists (faster and more reliable)
