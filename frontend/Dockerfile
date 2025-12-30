@@ -1,9 +1,8 @@
 # Development stage
 FROM node:18
 
-# Update package manager and install yarn
-RUN apt-get update && apt-get install -y libc6-dev && \
-    npm install -g yarn
+# Update package manager
+RUN apt-get update && apt-get install -y libc6-dev
 
 WORKDIR /app
 
