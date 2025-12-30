@@ -9,31 +9,31 @@ help: ## Show this help message
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  %-15s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
 build: ## Build all services
-	docker-compose build
+	docker compose build
 
 up: ## Start all services
-	docker-compose up -d
+	docker compose up -d
 
 down: ## Stop all services
-	docker-compose down
+	docker compose down
 
 restart: ## Restart all services
-	docker-compose restart
+	docker compose restart
 
 logs: ## Show logs from all services
-	docker-compose logs -f
+	docker compose logs -f
 
 migrate: ## Run database migrations
-	docker-compose exec backend python manage.py migrate
+	docker compose exec backend python manage.py migrate
 
 collectstatic: ## Collect static files
-	docker-compose exec backend python manage.py collectstatic --noinput
+	docker compose exec backend python manage.py collectstatic --noinput
 
 shell: ## Open Django shell
-	docker-compose exec backend python manage.py shell
+	docker compose exec backend python manage.py shell
 
 dbshell: ## Open database shell
-	docker-compose exec db psql -U habits_user -d habits_db
+	docker compose exec db psql -U habits_user -d habits_db
 
 frontend-install: ## Install frontend dependencies
 	cd frontend && npm install
@@ -42,10 +42,10 @@ frontend-build: ## Build frontend for production
 	docker build -t habits-frontend ./frontend
 
 backend-test: ## Run backend tests
-	docker-compose exec backend python manage.py test
+	docker compose exec backend python manage.py test
 
 clean: ## Remove all containers, volumes, and images
-	docker-compose down -v --rmi all
+	docker compose down -v --rmi all
 
 deploy: ## Full deployment (build, migrate, collect static)
 	@echo "🚀 Starting full deployment..."

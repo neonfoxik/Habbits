@@ -45,23 +45,32 @@ CORS_ALLOWED_ORIGINS=https://your-domain.com,https://www.your-domain.com
 ./deploy.sh
 
 # Или вручную:
-docker-compose up -d --build
+docker compose up -d --build
 
 # Примените миграции базы данных
-docker-compose exec backend python manage.py migrate
+docker compose exec backend python manage.py migrate
 
 # Соберите статические файлы
-docker-compose exec backend python manage.py collectstatic --noinput
+docker compose exec backend python manage.py collectstatic --noinput
+```
+
+**Для оптимизации сборки** (опционально):
+```bash
+# Создайте package-lock.json внутри Docker (для быстрой сборки)
+docker run --rm -v $(pwd)/frontend:/app -w /app node:18-alpine sh -c "npm install && cp package-lock.json ."
+
+# Добавьте в git
+git add frontend/package-lock.json
 ```
 
 ### Шаг 4: Проверка развертывания
 
 ```bash
 # Проверьте статус контейнеров
-docker-compose ps
+docker compose ps
 
 # Посмотрите логи
-docker-compose logs -f
+docker compose logs -f
 
 # Приложение будет доступно по адресу:
 # http://your-server-ip
@@ -176,18 +185,21 @@ CSRF_COOKIE_SECURE=True
 
 ```bash
 # Docker
-docker-compose logs -f
+docker compose logs -f
 
 # Системные логи
 sudo journalctl -u gunicorn -f
 sudo tail -f /var/log/nginx/error.log
+
+# Docker логи
+docker compose logs -f
 ```
 
 ### Резервное копирование базы данных
 
 ```bash
 # Docker
-docker-compose exec db pg_dump -U habits_user habits_db > backup_$(date +%Y%m%d_%H%M%S).sql
+docker compose exec db pg_dump -U habits_user habits_db > backup_$(date +%Y%m%d_%H%M%S).sql
 
 # Ручная настройка
 pg_dump -U habits_user -h localhost habits_db > backup_$(date +%Y%m%d_%H%M%S).sql
@@ -217,10 +229,10 @@ sudo systemctl restart nginx
 
 ```bash
 # Проверьте подключение
-docker-compose exec backend python manage.py dbshell
+docker compose exec backend python manage.py dbshell
 
 # Проверьте логи базы данных
-docker-compose logs db
+docker compose logs db
 ```
 
 ### Проблемы с Nginx

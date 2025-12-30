@@ -35,8 +35,8 @@ check_dependencies() {
         exit 1
     fi
 
-    if ! command -v docker-compose &> /dev/null; then
-        print_error "Docker Compose is not installed. Please install Docker Compose first."
+    if ! command -v docker &> /dev/null || ! docker compose version &> /dev/null; then
+        print_error "Docker Compose V2 is not available. Please install Docker Desktop or Docker Engine with Compose V2."
         exit 1
     fi
 
@@ -64,18 +64,18 @@ deploy_services() {
 
     # Start all services
     print_status "Starting Docker services..."
-    docker-compose up -d --build
+    docker compose up -d --build
 
     print_status "Waiting for services to be ready..."
     sleep 30
 
     # Run database migrations
     print_status "Running database migrations..."
-    docker-compose exec -T backend python manage.py migrate
+    docker compose exec -T backend python manage.py migrate
 
     # Collect static files
     print_status "Collecting static files..."
-    docker-compose exec -T backend python manage.py collectstatic --noinput
+    docker compose exec -T backend python manage.py collectstatic --noinput
 
     print_status "Deployment completed successfully!"
     print_status "Your app should be available at http://localhost"
@@ -84,7 +84,7 @@ deploy_services() {
 # Show logs
 show_logs() {
     print_status "Showing service logs (press Ctrl+C to exit)..."
-    docker-compose logs -f
+    docker compose logs -f
 }
 
 # Main menu
@@ -105,14 +105,14 @@ show_menu() {
 # Restart services
 restart_services() {
     print_status "Restarting services..."
-    docker-compose restart
+    docker compose restart
     print_status "Services restarted."
 }
 
 # Stop services
 stop_services() {
     print_status "Stopping services..."
-    docker-compose down
+    docker compose down
     print_status "Services stopped."
 }
 
@@ -126,12 +126,12 @@ update_application() {
     docker build -t habits-frontend ./frontend
 
     # Rebuild and restart
-    docker-compose down
-    docker-compose up -d --build
+    docker compose down
+    docker compose up -d --build
 
     # Run migrations and collect static
-    docker-compose exec -T backend python manage.py migrate
-    docker-compose exec -T backend python manage.py collectstatic --noinput
+    docker compose exec -T backend python manage.py migrate
+    docker compose exec -T backend python manage.py collectstatic --noinput
 
     print_status "Application updated successfully!"
 }
