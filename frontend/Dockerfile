@@ -9,8 +9,11 @@ WORKDIR /app
 # Copy npm config and package files
 COPY .npmrc package*.json ./
 
+# Configure network for faster downloads
+RUN echo "nameserver 8.8.8.8" >> /etc/resolv.conf
+
 # Install dependencies
-RUN npm install
+RUN npm install --verbose
 
 # Copy source code
 COPY . .
