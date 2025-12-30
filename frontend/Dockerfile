@@ -1,9 +1,8 @@
 # Development stage
 FROM node:18
 
-# Update package manager and install latest npm
+# Update package manager
 RUN apt-get update && apt-get install -y libc6-dev
-RUN npm install -g npm@latest
 
 WORKDIR /app
 
