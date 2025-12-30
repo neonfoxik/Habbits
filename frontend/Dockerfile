@@ -6,8 +6,8 @@ RUN apt-get update && apt-get install -y libc6-dev
 
 WORKDIR /app
 
-# Copy npm config and package files
-COPY .npmrc package*.json ./
+# Copy yarn config and package files
+COPY .yarnrc.yml package*.json ./
 
 # Install dependencies with yarn (faster than npm)
 RUN yarn install --verbose
