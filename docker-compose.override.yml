@@ -6,11 +6,11 @@ services:
     environment:
       - DEBUG=False
       - SECRET_KEY=django-insecure-dev-key-change-in-production
-      - ALLOWED_HOSTS=actiontest.ru,www.actiontest.ru,localhost,127.0.0.1
+      - ALLOWED_HOSTS=ter.actiontest.ru,localhost,127.0.0.1
       - DB_NAME=habits_db
       - DB_USER=habits_user
       - DB_PASSWORD=habits_password
-      - CORS_ALLOWED_ORIGINS=https://actiontest.ru,https://www.actiontest.ru
+      - CORS_ALLOWED_ORIGINS=https://ter.actiontest.ru
     volumes:
       - ./backend:/app
     ports:

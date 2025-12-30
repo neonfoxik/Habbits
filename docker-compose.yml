@@ -39,6 +39,15 @@ services:
     networks:
       - habits_network
 
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    networks:
+      - habits_network
+
   nginx:
     image: nginx:alpine
     restart: unless-stopped
@@ -70,6 +79,7 @@ volumes:
   static_files:
   media_files:
   letsencrypt:
+  redis_data:
 
 networks:
   habits_network:
